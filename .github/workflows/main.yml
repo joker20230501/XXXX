@@ -12,13 +12,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Auto-Unpack & Locate Project
+      - name: Auto-Unpack & Prepare
         run: |
-          echo "=== 1. 檢查檔案 ==="
-          ls -la
-          # 若有上傳 zip 壓縮檔，自動在雲端解壓縮
           for f in $(find . -maxdepth 2 -name "*.zip"); do
-            echo "發現壓縮檔: $f，自動解壓中..."
+            echo "Found zip archive: $f, extracting..."
             unzip -o "$f"
           done
 
@@ -31,20 +28,27 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.x'
+          flutter-version: '3.19.6'
           channel: 'stable'
 
-      - name: Auto Find Flutter Project & Build AAB
+      - name: Auto Repair Android Embedding & Build AAB
         run: |
-          echo "=== 自動定位 Flutter 專案 ==="
+          echo "=== 1. 定位專案目錄 ==="
           FLUTTER_DIR=$(find . -name "pubspec.yaml" -not -path "*/.*" -exec dirname {} \; | head -n 1)
           if [ -z "$FLUTTER_DIR" ]; then
-            echo "❌ 找不到專案設定檔，請確認有上傳專案檔案或 zip"
+            echo "❌ 找不到專案設定檔"
             exit 1
           fi
-          echo "✅ 成功找到專案路徑: $FLUTTER_DIR"
+          echo "✅ 專案路徑: $FLUTTER_DIR"
           cd "$FLUTTER_DIR"
+
+          echo "=== 2. 自動修復並補齊 Android v2 Embedding ==="
+          flutter create . --platforms=android --org=vn.vieclambando
+
+          echo "=== 3. 下載相依套件 ==="
           flutter pub get
+
+          echo "=== 4. 生成 Google Play AAB 安裝包 ==="
           flutter build appbundle --release --no-tree-shake-icons
 
       - name: Upload AAB Artifact
