@@ -31,7 +31,7 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
 
-      - name: Auto Repair Android Embedding & Build AAB
+      - name: Clean Rebuild Android Project & Build AAB
         run: |
           echo "=== 1. 定位專案目錄 ==="
           FLUTTER_DIR=$(find . -name "pubspec.yaml" -not -path "*/.*" -exec dirname {} \; | head -n 1)
@@ -42,13 +42,17 @@ jobs:
           echo "✅ 專案路徑: $FLUTTER_DIR"
           cd "$FLUTTER_DIR"
 
-          echo "=== 2. 自動修復並補齊 Android v2 Embedding ==="
+          echo "=== 2. 重建乾淨標準的 Android 原生工程 ==="
+          rm -rf android
           flutter create . --platforms=android --org=vn.vieclambando
 
-          echo "=== 3. 下載相依套件 ==="
+          echo "=== 3. 注入定位與網路權限 ==="
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <application/g' android/app/src/main/AndroidManifest.xml
+
+          echo "=== 4. 下載相依套件 ==="
           flutter pub get
 
-          echo "=== 4. 生成 Google Play AAB 安裝包 ==="
+          echo "=== 5. 生成 Google Play AAB 安裝包 ==="
           flutter build appbundle --release --no-tree-shake-icons
 
       - name: Upload AAB Artifact
