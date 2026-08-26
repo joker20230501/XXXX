@@ -1,4 +1,4 @@
-name: Build Google Play AAB Bundle
+name: Build Android APK & Google Play AAB
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
 
-      - name: Clean Rebuild Android Project & Build AAB
+      - name: Clean Rebuild Android Native & Build APK + AAB
         run: |
           echo "=== 1. 定位專案目錄 ==="
           FLUTTER_DIR=$(find . -name "pubspec.yaml" -not -path "*/.*" -exec dirname {} \; | head -n 1)
@@ -42,7 +42,7 @@ jobs:
           echo "✅ 專案路徑: $FLUTTER_DIR"
           cd "$FLUTTER_DIR"
 
-          echo "=== 2. 重建乾淨標準的 Android 原生工程 ==="
+          echo "=== 2. 重置標準 Android 原生架構 (徹底解決 Gradle/Kotlin 衝突) ==="
           rm -rf android
           flutter create . --platforms=android --org=vn.vieclambando
 
@@ -52,10 +52,19 @@ jobs:
           echo "=== 4. 下載相依套件 ==="
           flutter pub get
 
-          echo "=== 5. 生成 Google Play AAB 安裝包 ==="
+          echo "=== 5. 生成 Android 實機安裝檔 (.apk) ==="
+          flutter build apk --release --no-tree-shake-icons
+
+          echo "=== 6. 生成 Google Play 上架安裝檔 (.aab) ==="
           flutter build appbundle --release --no-tree-shake-icons
 
-      - name: Upload AAB Artifact
+      - name: Upload APK Artifact (直接安裝至手機)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk-install-now
+          path: "**/build/app/outputs/flutter-apk/app-release.apk"
+
+      - name: Upload AAB Artifact (Google Play 上架專用)
         uses: actions/upload-artifact@v4
         with:
           name: google-play-app-release-aab
