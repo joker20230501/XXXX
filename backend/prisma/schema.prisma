@@ -1,0 +1,188 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  WORKER
+  EMPLOYER
+  ADMIN
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  SEASONAL
+  SHIFT_WORK
+}
+
+enum SalaryType {
+  MONTHLY
+  DAILY
+  HOURLY
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  INTERVIEW_SCHEDULED
+}
+
+model User {
+  id            String          @id @default(uuid())
+  phone         String          @unique
+  email         String?         @unique
+  passwordHash  String
+  role          Role            @default(WORKER)
+  zaloId        String?         @unique
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  workerProfile WorkerProfile?
+  company       Company?
+}
+
+model WorkerProfile {
+  id                  String           @id @default(uuid())
+  userId              String           @unique
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName            String
+  avatarUrl           String?
+  expectedSalaryMin   Decimal          @db.Decimal(12, 2)
+  expectedSalaryMax   Decimal          @db.Decimal(12, 2)
+  salaryType          SalaryType       @default(MONTHLY)
+  experienceYears     Int              @default(0)
+  bio                 String?
+  isLookingForJob     Boolean          @default(true)
+  
+  // Stability Score (Visible ONLY to Employers, HIDDEN from Workers)
+  stabilityScore      Int              @default(80) // 0 - 100
+  avgTenureMonths     Float            @default(12.0)
+  
+  // Exact location (Protected)
+  exactLatitude       Float
+  exactLongitude      Float
+  
+  // Fuzzed location for public map display
+  fuzzyLatitude       Float
+  fuzzyLongitude      Float
+  
+  province            String
+  district            String
+  skills              String[]
+  certificates        String[]
+  
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  workExperiences     WorkExperience[]
+  applications        JobApplication[]
+  reviewsWritten      JobReview[]
+}
+
+model WorkExperience {
+  id                String        @id @default(uuid())
+  workerProfileId   String
+  workerProfile     WorkerProfile @relation(fields: [workerProfileId], references: [id], onDelete: Cascade)
+  companyName       String
+  roleTitle         String
+  startDate         DateTime
+  endDate           DateTime?
+  durationMonths    Int
+  createdAt         DateTime      @default(now())
+}
+
+model Company {
+  id            String        @id @default(uuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName   String
+  taxCode       String?       @unique
+  logoUrl       String?
+  industry      String
+  address       String
+  province      String
+  district      String
+  latitude      Float
+  longitude     Float
+  isVerified    Boolean       @default(false)
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  jobPostings   JobPosting[]
+}
+
+model JobPosting {
+  id                String            @id @default(uuid())
+  companyId         String
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title             String
+  jobType           JobType           @default(FULL_TIME)
+  
+  salaryMin         Decimal           @db.Decimal(12, 2)
+  salaryMax         Decimal           @db.Decimal(12, 2)
+  salaryType        SalaryType        @default(MONTHLY)
+  isGross           Boolean           @default(false)
+  
+  requiredSkills    String[]
+  preferredSkills   String[]
+  benefits          String[]
+  description       String
+  
+  // Job Workplace Rating (Visible ONLY to Workers, HIDDEN from Employers)
+  averageRating     Float             @default(4.5)
+  reviewCount       Int               @default(0)
+  salaryFairness    Float             @default(4.8)
+  overtimeLoad      Float             @default(4.2)
+  
+  workAddress       String
+  province          String
+  district          String
+  latitude          Float
+  longitude         Float
+  
+  isActive          Boolean           @default(true)
+  viewsCount        Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  applications      JobApplication[]
+  reviews           JobReview[]
+}
+
+model JobReview {
+  id                String        @id @default(uuid())
+  jobId             String
+  job               JobPosting    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workerProfileId   String
+  workerProfile     WorkerProfile @relation(fields: [workerProfileId], references: [id], onDelete: Cascade)
+  
+  rating            Float         // 1.0 - 5.0
+  salaryFairness    Float         // 1.0 - 5.0
+  environmentRating Float         // 1.0 - 5.0
+  comment           String?
+  isVerifiedWorker  Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+}
+
+model JobApplication {
+  id                String            @id @default(uuid())
+  jobId             String
+  job               JobPosting        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workerProfileId   String
+  workerProfile     WorkerProfile     @relation(fields: [workerProfileId], references: [id], onDelete: Cascade)
+  status            ApplicationStatus @default(PENDING)
+  
+  contactUnlocked   Boolean           @default(false)
+  unlockedAt        DateTime?
+  appliedAt         DateTime          @default(now())
+  note              String?
+
+  @@unique([jobId, workerProfileId])
+}
